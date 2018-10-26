@@ -139,27 +139,32 @@ int OS_BindUnixDomain(const char *path, int type, int max_msg_size)
     strncpy(n_us.sun_path, path, sizeof(n_us.sun_path) - 1);
 
     if ((ossock = socket(PF_UNIX, type, 0)) < 0) {
+        merror("At socket(): %d %s",ossock,path);
         return (OS_SOCKTERR);
     }
 
     if (bind(ossock, (struct sockaddr *)&n_us, SUN_LEN(&n_us)) < 0) {
+        merror("At bind(): %d %s",ossock,path);
         OS_CloseSocket(ossock);
         return (OS_SOCKTERR);
     }
 
     /* Change permissions */
     if (chmod(path, 0660) < 0) {
+        merror("At chmod(): %d %s",errno,path);
         OS_CloseSocket(ossock);
         return (OS_SOCKTERR);
     }
 
     if (type == SOCK_STREAM && listen(ossock, 128) < 0) {
+        merror("At listen(): %d %s",errno,path);
         OS_CloseSocket(ossock);
         return (OS_SOCKTERR);
     }
 
     // Set socket maximum size
     if (OS_SetSocketSize(ossock, RECV_SOCK, max_msg_size) < 0) {
+        merror("At OS_SetSocketSize(): %d %s",errno,path);
         OS_CloseSocket(ossock);
         return (OS_SOCKTERR);
     }
