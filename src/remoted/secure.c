@@ -402,8 +402,10 @@ int _close_sock(keystore * keys, int sock) {
     key_lock_read();
     retval = OS_DeleteSocket(keys, sock);
     key_unlock();
-    close(sock);
-    rem_dec_tcp();
+
+    if (close(sock) == 0) {
+        rem_dec_tcp();
+    }
 
     mdebug1("TCP peer disconnected [%d]", sock);
 
