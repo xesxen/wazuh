@@ -35,7 +35,11 @@ typedef struct pending_data_t {
 typedef struct message_t {
     char * buffer;
     unsigned int size;
+#ifndef WIN32
+    struct sockaddr_in6 addr;
+#else
     struct sockaddr_in addr;
+#endif
     int sock;
 } message_t;
 

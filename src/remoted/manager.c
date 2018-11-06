@@ -100,7 +100,13 @@ void save_controlmsg(unsigned int agentid, char *r_msg, size_t msg_length)
     send_msg(keys.keyentries[agentid]->id, msg_ack, -1);
 
     if (strcmp(r_msg, HC_STARTUP) == 0) {
+#ifndef WIN32
+        char srcip[IPSIZE + 1] = "UNKNOWN";
+        getnameinfo((struct sockaddr *)&keys.keyentries[agentid]->peer_info, sizeof(keys.keyentries[agentid]->peer_info), srcip, IPSIZE, NULL, 0, NI_NUMERICHOST);
+        mdebug1("Agent %s sent HC_STARTUP from %s.", keys.keyentries[agentid]->name, srcip);
+#else
         mdebug1("Agent %s sent HC_STARTUP from %s.", keys.keyentries[agentid]->name, inet_ntoa(keys.keyentries[agentid]->peer_info.sin_addr));
+#endif
         is_startup = 1;
     } else {
         /* Clean uname and shared files (remove random string) */

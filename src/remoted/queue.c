@@ -30,7 +30,11 @@ int rem_msgpush(const char * buffer, unsigned long size, struct sockaddr_in * ad
     os_malloc(size, message->buffer);
     memcpy(message->buffer, buffer, size);
     message->size = size;
+#ifndef WIN32
+    memcpy(&message->addr, addr, sizeof(struct sockaddr_in6));
+#else
     memcpy(&message->addr, addr, sizeof(struct sockaddr_in));
+#endif
     message->sock = sock;
 
     w_mutex_lock(&mutex);
