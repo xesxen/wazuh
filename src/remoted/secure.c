@@ -9,6 +9,8 @@
 
 #if defined(__linux__)
 #include <sys/epoll.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #elif defined(__MACH__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 #include <sys/types.h>
 #include <sys/event.h>
@@ -28,7 +30,7 @@ static void * rem_handler_main(__attribute__((unused)) void * args);
 void * rem_keyupdate_main(__attribute__((unused)) void * args);
 
 /* Handle each message received */
-static void HandleSecureMessage(char *buffer, int recv_b, struct sockaddr_in *peer_info, int sock_client);
+static void HandleSecureMessage(char *buffer, int recv_b, struct sockaddr_storage *peer_info, int sock_client);
 
 // Close and remove socket from keystore
 int _close_sock(keystore * keys, int sock);
@@ -42,7 +44,7 @@ void HandleSecure()
     char buffer[OS_MAXSTR + 1];
     ssize_t recv_b;
     uint32_t length;
-    struct sockaddr_in peer_info;
+    struct sockaddr_storage peer_info;
 
 #if defined(__MACH__) || defined(__FreeBSD__) || defined(__OpenBSD__)
     const struct timespec TS_ZERO = { 0, 0 };
@@ -186,7 +188,7 @@ void HandleSecure()
                     }
 
                     rem_inc_tcp();
-                    mdebug1("New TCP connection at %s.", inet_ntoa(peer_info.sin_addr));
+                    mdebug1("New TCP connection at %s.", OS_GetAddress(peer_info));
 #if defined(__MACH__) || defined(__FreeBSD__) || defined(__OpenBSD__)
                     EV_SET(&request, sock_client, EVFILT_READ, EV_ADD, 0, 0, 0);
 
@@ -224,20 +226,20 @@ void HandleSecure()
                         switch (recv_b) {
                         case -1:
                             if (errno == ENOTCONN) {
-                                mdebug1("TCP peer at %s disconnected (ENOTCONN).", inet_ntoa(peer_info.sin_addr));
+                                mdebug1("TCP peer at %s disconnected (ENOTCONN).", OS_GetAddress(peer_info));
                             } else {
-                                merror("TCP peer at %s: %s (%d)", inet_ntoa(peer_info.sin_addr), strerror(errno), errno);
+                                merror("TCP peer at %s: %s (%d)", OS_GetAddress(peer_info), strerror(errno), errno);
                             }
 
                             break;
 
                         case 0:
-                            mdebug1("TCP peer at %s disconnected.", inet_ntoa(peer_info.sin_addr));
+                            mdebug1("TCP peer at %s disconnected.", OS_GetAddress(peer_info));
                             break;
 
                         default:
                             // length > OS_MAXSTR
-                            merror("Too big message size from %s.", inet_ntoa(peer_info.sin_addr));
+                            merror("Too big message size from %s.", OS_GetAddress(peer_info));
                         }
 #ifdef __linux__
                         /* Kernel event is automatically deleted when closed */
@@ -254,7 +256,8 @@ void HandleSecure()
                     recv_b = recv(sock_client, buffer, length, MSG_WAITALL);
 
                     if (recv_b != (ssize_t)length) {
-                        merror("Incorrect message size from %s: expecting %u, got %zd", inet_ntoa(peer_info.sin_addr), length, recv_b);
+                        merror("Incorrect message size from %s: expecting %u, got %zd", OS_GetAddress(peer_info), length, recv_b);
+
 #ifdef __linux__
                         request.data.fd = sock_client;
                         if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, sock_client, &request) < 0) {
@@ -310,7 +313,7 @@ void * rem_keyupdate_main(__attribute__((unused)) void * args) {
     }
 }
 
-static void HandleSecureMessage(char *buffer, int recv_b, struct sockaddr_in *peer_info, int sock_client) {
+static void HandleSecureMessage(char *buffer, int recv_b, struct sockaddr_storage *peer_info, int sock_client) {
     int agentid;
     int protocol = logr.proto[logr.position];
     char cleartext_msg[OS_MAXSTR + 1];
@@ -321,7 +324,7 @@ static void HandleSecureMessage(char *buffer, int recv_b, struct sockaddr_in *pe
     size_t msg_length;
 
     /* Set the source IP */
-    strncpy(srcip, inet_ntoa(peer_info->sin_addr), IPSIZE);
+    strncpy(srcip, OS_GetAddress(*peer_info), IPSIZE);
     srcip[IPSIZE] = '\0';
 
     /* Initialize some variables */
